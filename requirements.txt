@@ -1,0 +1,8 @@
+requests
+python-dotenv~=1.0.1
+pydantic~=2.8.2
+redis
+reflex~=0.5.10
+cassandra-driver~=3.29.1
+reflex-chakra~=0.5.10
+httpx
