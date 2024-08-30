@@ -23,7 +23,7 @@ class CassandraDB(metaclass=Singleton):
         self._session = self._cluster.connect(CassandraDB.KEYSPACE)
         self._async_lock = asyncio.Lock()
         self._get_user_lc_questions = self._session.prepare(
-            f"SELECT question_name, question_url, difficulty, company_names, score FROM {CassandraDB.USER_QUESTIONS_TABLE} WHERE user_name = ? AND solved = false LIMIT 400"
+            f"SELECT question_name, question_url, difficulty, company_names, score FROM {CassandraDB.USER_QUESTIONS_TABLE} WHERE user_name = ? AND solved = false"
         )
         self._get_youtube_videos = self._session.prepare(
             f"SELECT video_name, video_url, watched FROM {CassandraDB.USER_VIDEOS_TABLE} WHERE user_name = ?"
