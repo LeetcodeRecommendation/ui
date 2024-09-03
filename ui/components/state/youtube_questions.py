@@ -52,19 +52,26 @@ class YoutubeState(rx.State):
             async with self:
                 user_name = await self.get_state(UsernameState)
                 current_user = user_name.username
-            user_data = await cache.get_user_cache_data(current_user)
+            user_data = await cache.get_youtube_cache_data(current_user)
             async with self:
-                if user_data is not None and len(self.videos) == 0:
-                    await self.update_videos(user_data[0])
-                else:
+                if user_data is None:
                     db_data = await db.get_youtube_video(current_user)
                     if len(db_data) > 0:
-                        await cache.set_user_cache_data(current_user, db_data, None)
+                        await cache.set_user_youtube_cache(current_user, db_data)
+                        await self.update_videos(db_data)
+                elif len(self.videos) == 0:
+                    db_data = await db.get_youtube_video(current_user)
+                    if len(db_data) > 0:
+                        await cache.set_user_youtube_cache(current_user, db_data)
                         await self.update_videos(db_data)
             await asyncio.sleep(1)
 
     @rx.background
     async def toggle_video_completion(self, title: str, checked: bool):
+        async with self:
+            self.video_mapping[title].completed = checked
+            self.videos = self.videos
+
         log = logging.getLogger(LOGGER_NAME)
 
         uri = f"http://{Environment.get_user_request_uri()}/api/v1/youtube_marking"
@@ -80,8 +87,6 @@ class YoutubeState(rx.State):
                     "user_marked": checked,
                 },
             )
-        async with self:
-            self.video_mapping[title].completed = checked
         cache = RedisCache()
-        await cache.set_user_cache_data(user_name, self.videos, None)
+        await cache.set_user_youtube_cache(user_name, self.videos)
         log.info(f"Sent youtube marking request with status: {resp.status_code}")

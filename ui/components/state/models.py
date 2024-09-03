@@ -7,6 +7,7 @@ class LeetCodeQuestion(rx.Base):
     difficulty: str
     companies: list[str]
     completed: bool
+    manually_marked_by_user: bool
 
 
 class YoutubeVideo(rx.Base):

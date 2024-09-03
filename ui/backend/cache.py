@@ -9,7 +9,8 @@ from ui.components.state.models import YoutubeVideo, LeetCodeQuestion
 
 
 class RedisCache(metaclass=Singleton):
-    USER_CACHE_PREFIX: Final[str] = r"user-recommendation-cache-{name}"
+    USER_YOUTUBE_CACHE_PREFIX: Final[str] = r"user-recommendation-cache-youtube-{name}"
+    USER_LEETCODE_CACHE_PREFIX: Final[str] = r"user-recommendation-cache-lc-{name}"
 
     def __init__(self):
         print("initializing cache")
@@ -18,63 +19,60 @@ class RedisCache(metaclass=Singleton):
         )
         self._lock = asyncio.Lock()
 
-    async def get_user_cache_data(
+    async def get_leet_code_cache_data(
         self, user: str
-    ) -> Optional[tuple[list[YoutubeVideo], list[LeetCodeQuestion]]]:
+    ) -> Optional[list[LeetCodeQuestion]]:
         async with self._lock:
             if await self._redis_client.exists(
-                RedisCache.USER_CACHE_PREFIX.format(name=user)
+                RedisCache.USER_LEETCODE_CACHE_PREFIX.format(name=user)
             ):
-                user_cache = json.loads(
+                leetcode_cache = json.loads(
                     await self._redis_client.get(
-                        RedisCache.USER_CACHE_PREFIX.format(name=user)
+                        RedisCache.USER_LEETCODE_CACHE_PREFIX.format(name=user)
                     )
                 )
-                youtube_questions = [
-                    YoutubeVideo(**video) for video in user_cache["youtube"]
-                ]
                 leetcode = [
-                    LeetCodeQuestion(**question) for question in user_cache["leetcode"]
+                    LeetCodeQuestion(**question) for question in leetcode_cache["data"]
                 ]
-                return youtube_questions, leetcode
+                return leetcode
             else:
                 return None
 
-    async def set_user_cache_data(
-        self,
-        user: str,
-        yt_videos: Optional[list[YoutubeVideo]],
-        lc_questions: Optional[list[LeetCodeQuestion]],
-    ) -> None:
+    async def get_youtube_cache_data(self, user: str) -> Optional[list[YoutubeVideo]]:
         async with self._lock:
             if await self._redis_client.exists(
-                RedisCache.USER_CACHE_PREFIX.format(name=user)
+                RedisCache.USER_YOUTUBE_CACHE_PREFIX.format(name=user)
             ):
-                user_cache = json.loads(
+                youtube_cache = json.loads(
                     await self._redis_client.get(
-                        RedisCache.USER_CACHE_PREFIX.format(name=user)
+                        RedisCache.USER_YOUTUBE_CACHE_PREFIX.format(name=user)
                     )
                 )
-                youtube_videos = (
-                    [YoutubeVideo(**video) for video in user_cache["youtube"]]
-                    if yt_videos is None
-                    else yt_videos
-                )
-                leetcode_questions = (
-                    [
-                        LeetCodeQuestion(**question)
-                        for question in user_cache["leetcode"]
-                    ]
-                    if lc_questions is None
-                    else lc_questions
-                )
+                youtube = [YoutubeVideo(**video) for video in youtube_cache["data"]]
+                return youtube
             else:
-                youtube_videos = yt_videos if yt_videos is not None else []
-                leetcode_questions = lc_questions if lc_questions is not None else []
-            data = {
-                "youtube": [video.dict() for video in youtube_videos],
-                "leetcode": [question.dict() for question in leetcode_questions],
-            }
+                return None
+
+    async def set_user_youtube_cache(
+        self,
+        user: str,
+        yt_videos: list[YoutubeVideo],
+    ) -> None:
+        async with self._lock:
+            yt_videos = {"data": [yt_video.dict() for yt_video in yt_videos]}
             await self._redis_client.set(
-                RedisCache.USER_CACHE_PREFIX.format(name=user), json.dumps(data)
+                RedisCache.USER_YOUTUBE_CACHE_PREFIX.format(name=user),
+                json.dumps(yt_videos),
+            )
+
+    async def set_user_leetcode_data(
+        self,
+        user: str,
+        lc_questions: list[LeetCodeQuestion],
+    ) -> None:
+        async with self._lock:
+            lc_data = {"data": [lc_question.dict() for lc_question in lc_questions]}
+            await self._redis_client.set(
+                RedisCache.USER_LEETCODE_CACHE_PREFIX.format(name=user),
+                json.dumps(lc_data),
             )

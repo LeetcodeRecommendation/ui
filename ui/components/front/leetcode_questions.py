@@ -12,9 +12,9 @@ def leetcode_question(question: LeetCodeQuestion):
     return rx.box(
         rx.hstack(
             rx.checkbox(
-                is_checked=question.completed,
-                on_change=lambda changed: LeetCodeQuestionsState.toggle_question_completion(
-                    question.title, changed
+                checked=question.manually_marked_by_user,
+                on_change=lambda checked: LeetCodeQuestionsState.toggle_question_completion(
+                    question.title, checked
                 ),
             ),
             rx.vstack(

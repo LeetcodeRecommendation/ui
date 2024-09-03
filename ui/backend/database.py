@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from collections import defaultdict
 from typing import Final
 from cassandra.cluster import Cluster
 from cassandra.query import PreparedStatement
@@ -23,7 +24,7 @@ class CassandraDB(metaclass=Singleton):
         self._session = self._cluster.connect(CassandraDB.KEYSPACE)
         self._async_lock = asyncio.Lock()
         self._get_user_lc_questions = self._session.prepare(
-            f"SELECT question_name, question_url, difficulty, company_names, score FROM {CassandraDB.USER_QUESTIONS_TABLE} WHERE user_name = ? AND solved = false"
+            f"SELECT question_name, question_url, difficulty, company_names, score, manually_marked_by_user FROM {CassandraDB.USER_QUESTIONS_TABLE} WHERE user_name = ? AND solved = false"
         )
         self._get_youtube_videos = self._session.prepare(
             f"SELECT video_name, video_url, watched FROM {CassandraDB.USER_VIDEOS_TABLE} WHERE user_name = ?"
@@ -38,19 +39,26 @@ class CassandraDB(metaclass=Singleton):
     async def get_leetcode_user_questions(
         self, user_name: str
     ) -> list[LeetCodeQuestion]:
+        question_score_to_questions = defaultdict(list)
+
         res = await self.run_statement(self._get_user_lc_questions.bind([user_name]))
-        results = {
-            question[4]: LeetCodeQuestion(
-                title=question[0],
-                url=question[1],
-                difficulty=question[2],
-                companies=question[3],
-                completed=False,
+        [
+            question_score_to_questions[question[4]].append(
+                LeetCodeQuestion(
+                    title=question[0],
+                    url=question[1],
+                    difficulty=question[2],
+                    companies=question[3],
+                    completed=False,
+                    manually_marked_by_user=question[5],
+                )
             )
             for question in res
-        }
-        sorted_keys = sorted(results.keys(), reverse=True)
-        return [results[key] for key in sorted_keys]
+        ]
+        sorted_keys = sorted(question_score_to_questions.keys(), reverse=True)
+        final_res = []
+        [final_res.extend(question_score_to_questions[key]) for key in sorted_keys]
+        return final_res
 
     async def get_youtube_video(self, user_name: str) -> list[YoutubeVideo]:
         res = await self.run_statement(self._get_youtube_videos.bind([user_name]))
